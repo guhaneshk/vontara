@@ -222,7 +222,7 @@ export default function HomePage() {
       <section className="relative z-10 py-32 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
-            <h2 className="text-5xl font-bold text-white mb-6 text-glow">Student Success Stories</h2>
+            <h2 className="text-5xl font-bold text-white mb-6 text-glow">Interviews Coming Soon</h2>
             <p className="text-2xl text-white/80 max-w-3xl mx-auto">
               Coming soon + interviews with industry professionals
             </p>
