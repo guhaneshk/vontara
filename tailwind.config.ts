@@ -1,9 +1,12 @@
 import type { Config } from 'tailwindcss'
 
+// Allow require in TypeScript
+declare const require: any
+
 // all in fixtures is set to tailwind v3 as interims solutions
 
 const config: Config = {
-  darkMode: ['class'],
+  darkMode: 'class',
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -93,6 +96,6 @@ const config: Config = {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [require('tailwindcss-animate') as any],
 }
 export default config
