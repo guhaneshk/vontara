@@ -8,19 +8,38 @@ import { FloatingCard } from "@/components/ui/floating-card"
 import { Badge } from "@/components/ui/badge"
 import { Logo } from "@/components/ui/logo"
 import { Clock, Users, Play, ArrowRight, BookOpen } from "lucide-react"
-import { CourseManager, type Course } from "@/lib/course-manager"
+import { CourseManagerSupabase } from "@/lib/course-manager-supabase"
+import type { Course, Chapter } from "@/lib/supabase"
+
+type CourseWithChapters = Course & { chapters: Chapter[] }
 
 export default function CoursesPage() {
-  const [courses, setCourses] = useState<Course[]>([])
+  const [courses, setCourses] = useState<CourseWithChapters[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedLevel, setSelectedLevel] = useState("All")
   const levels = ["All", "Beginner", "Intermediate", "Advanced"]
 
   useEffect(() => {
-    setCourses(CourseManager.getCourses())
+    loadCourses()
     Analytics.trackPageView("/courses")
   }, [])
 
+  const loadCourses = async () => {
+    setLoading(true)
+    const coursesData = await CourseManagerSupabase.getCourses()
+    setCourses(coursesData)
+    setLoading(false)
+  }
+
   const filteredCourses = selectedLevel === "All" ? courses : courses.filter((course) => course.level === selectedLevel)
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-900 via-emerald-900 to-teal-900 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-900 via-emerald-900 to-teal-900 relative overflow-hidden">
@@ -79,8 +98,7 @@ export default function CoursesPage() {
             AutoCAD Courses
           </h1>
           <p className="text-2xl text-white/80 max-w-3xl mx-auto leading-relaxed">
-            Easy courses designed by students, for students. Learn  fundamentals through structured
-            lessons.
+            Easy courses designed by students, for students. Learn fundamentals through structured lessons.
           </p>
         </div>
 
@@ -112,10 +130,7 @@ export default function CoursesPage() {
                   <img
                     src={
                       course.thumbnail ||
-                      "/placeholder.svg?height=300&width=500&text=" + encodeURIComponent(course.title) ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg"
+                      "/placeholder.svg?height=300&width=500&text=" + encodeURIComponent(course.title)
                     }
                     alt={course.title}
                     className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-110"

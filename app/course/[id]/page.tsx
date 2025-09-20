@@ -9,25 +9,35 @@ import { FloatingCard } from "@/components/ui/floating-card"
 import { ProgressBar } from "@/components/ui/progress-bar"
 import { Logo } from "@/components/ui/logo"
 import { ChevronLeft, Play, CheckCircle, Circle, Clock, BookOpen, Users } from "lucide-react"
-import { CourseManager, type Course } from "@/lib/course-manager"
+import { CourseManagerSupabase } from "@/lib/course-manager-supabase"
+import type { Course, Chapter } from "@/lib/supabase"
+
+type CourseWithChapters = Course & { chapters: Chapter[] }
 
 export default function CoursePage() {
   const params = useParams()
   const courseId = params.id as string
-  const [course, setCourse] = useState<Course | null>(null)
+  const [course, setCourse] = useState<CourseWithChapters | null>(null)
+  const [loading, setLoading] = useState(true)
   const [currentChapter, setCurrentChapter] = useState(0)
   const [completedChapters, setCompletedChapters] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const foundCourse = CourseManager.getCourse(courseId)
+    loadCourse()
+  }, [courseId])
+
+  const loadCourse = async () => {
+    setLoading(true)
+    const foundCourse = await CourseManagerSupabase.getCourse(courseId)
     setCourse(foundCourse)
+    setLoading(false)
 
     // Load completed chapters from localStorage
     const saved = localStorage.getItem(`course_${courseId}_progress`)
     if (saved) {
       setCompletedChapters(new Set(JSON.parse(saved)))
     }
-  }, [courseId])
+  }
 
   useEffect(() => {
     if (course) {
@@ -62,10 +72,40 @@ export default function CoursePage() {
     localStorage.setItem(`course_${courseId}_progress`, JSON.stringify(Array.from(newCompleted)))
   }
 
-  if (!course) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-900 via-emerald-900 to-teal-900 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-900 via-emerald-900 to-teal-900 relative overflow-hidden">
+        <div className="absolute inset-0 dot-pattern opacity-20" />
+
+        <nav className="relative z-50 p-6 border-b border-white/10">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <Link href="/courses" className="flex items-center text-white hover:text-green-300 transition-colors">
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Back to Courses
+            </Link>
+          </div>
+        </nav>
+
+        <div className="relative z-10 flex items-center justify-center min-h-[60vh]">
+          <FloatingCard>
+            <div className="glass rounded-3xl p-12 text-center max-w-md">
+              <Logo size="xl" className="mx-auto mb-6 animate-bounce" />
+              <h3 className="text-2xl font-bold text-white mb-4">Course Not Found</h3>
+              <p className="text-white/80 mb-6">This course doesn't exist or has been removed.</p>
+              <Link href="/courses">
+                <AnimatedButton>Back to Courses</AnimatedButton>
+              </Link>
+            </div>
+          </FloatingCard>
+        </div>
       </div>
     )
   }
@@ -184,7 +224,7 @@ export default function CoursePage() {
 
                 <div className="space-y-2">
                   {course.chapters
-                    .sort((a, b) => a.order - b.order)
+                    .sort((a, b) => a.order_number - b.order_number)
                     .map((chapter, index) => (
                       <div
                         key={chapter.id}
@@ -254,7 +294,7 @@ export default function CoursePage() {
                 {/* Video Player */}
                 <div className="aspect-video bg-black rounded-2xl mb-8 overflow-hidden hover:scale-105 transition-transform duration-300">
                   <iframe
-                    src={currentChapterData.videoUrl}
+                    src={currentChapterData.video_url}
                     title={currentChapterData.title}
                     className="w-full h-full"
                     allowFullScreen

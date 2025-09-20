@@ -13,17 +13,21 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Logo } from "@/components/ui/logo"
 import { AdminAuth } from "@/lib/admin-auth"
-import { CourseManager, type Course, type Chapter } from "@/lib/course-manager"
+import { CourseManagerSupabase } from "@/lib/course-manager-supabase"
 import { Plus, Trash2, Edit, LogOut, Settings, BookOpen, Users, Play, Save, X, Youtube } from "lucide-react"
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard"
+import type { Course, Chapter } from "@/lib/supabase"
+
+type CourseWithChapters = Course & { chapters: Chapter[] }
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
-  const [courses, setCourses] = useState<Course[]>([])
+  const [courses, setCourses] = useState<CourseWithChapters[]>([])
+  const [loading, setLoading] = useState(false)
   const [showCourseForm, setShowCourseForm] = useState(false)
-  const [editingCourse, setEditingCourse] = useState<Course | null>(null)
+  const [editingCourse, setEditingCourse] = useState<CourseWithChapters | null>(null)
   const [showChapterForm, setShowChapterForm] = useState<string | null>(null)
   const [editingChapter, setEditingChapter] = useState<{ courseId: string; chapter: Chapter } | null>(null)
   const router = useRouter()
@@ -39,22 +43,29 @@ export default function AdminPage() {
   const [chapterForm, setChapterForm] = useState({
     title: "",
     description: "",
-    videoUrl: "",
+    video_url: "",
     duration: "",
   })
 
   useEffect(() => {
     setIsAuthenticated(AdminAuth.isAuthenticated())
     if (AdminAuth.isAuthenticated()) {
-      setCourses(CourseManager.getCourses())
+      loadCourses()
     }
   }, [])
+
+  const loadCourses = async () => {
+    setLoading(true)
+    const coursesData = await CourseManagerSupabase.getCourses()
+    setCourses(coursesData)
+    setLoading(false)
+  }
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     if (AdminAuth.login(password)) {
       setIsAuthenticated(true)
-      setCourses(CourseManager.getCourses())
+      loadCourses()
       setError("")
     } else {
       setError("Invalid password")
@@ -67,67 +78,79 @@ export default function AdminPage() {
     router.push("/")
   }
 
-  const handleCreateCourse = (e: React.FormEvent) => {
+  const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault()
-    const newCourse = CourseManager.addCourse({
-      ...courseForm,
-      chapters: [],
-    })
-    setCourses(CourseManager.getCourses())
-    setCourseForm({ title: "", description: "", thumbnail: "", level: "Beginner", duration: "" })
-    setShowCourseForm(false)
+    setLoading(true)
+    const newCourse = await CourseManagerSupabase.addCourse(courseForm)
+    if (newCourse) {
+      await loadCourses()
+      setCourseForm({ title: "", description: "", thumbnail: "", level: "Beginner", duration: "" })
+      setShowCourseForm(false)
+    }
+    setLoading(false)
   }
 
-  const handleUpdateCourse = (e: React.FormEvent) => {
+  const handleUpdateCourse = async (e: React.FormEvent) => {
     e.preventDefault()
     if (editingCourse) {
-      CourseManager.updateCourse(editingCourse.id, courseForm)
-      setCourses(CourseManager.getCourses())
+      setLoading(true)
+      await CourseManagerSupabase.updateCourse(editingCourse.id, courseForm)
+      await loadCourses()
       setEditingCourse(null)
       setCourseForm({ title: "", description: "", thumbnail: "", level: "Beginner", duration: "" })
+      setShowCourseForm(false)
+      setLoading(false)
     }
   }
 
-  const handleDeleteCourse = (id: string) => {
+  const handleDeleteCourse = async (id: string) => {
     if (confirm("Are you sure you want to delete this course?")) {
-      CourseManager.deleteCourse(id)
-      setCourses(CourseManager.getCourses())
+      setLoading(true)
+      await CourseManagerSupabase.deleteCourse(id)
+      await loadCourses()
+      setLoading(false)
     }
   }
 
-  const handleCreateChapter = (e: React.FormEvent) => {
+  const handleCreateChapter = async (e: React.FormEvent) => {
     e.preventDefault()
     if (showChapterForm) {
-      CourseManager.addChapter(showChapterForm, chapterForm)
-      setCourses(CourseManager.getCourses())
-      setChapterForm({ title: "", description: "", videoUrl: "", duration: "" })
+      setLoading(true)
+      await CourseManagerSupabase.addChapter(showChapterForm, chapterForm)
+      await loadCourses()
+      setChapterForm({ title: "", description: "", video_url: "", duration: "" })
       setShowChapterForm(null)
+      setLoading(false)
     }
   }
 
-  const handleUpdateChapter = (e: React.FormEvent) => {
+  const handleUpdateChapter = async (e: React.FormEvent) => {
     e.preventDefault()
     if (editingChapter) {
-      CourseManager.updateChapter(editingChapter.courseId, editingChapter.chapter.id, chapterForm)
-      setCourses(CourseManager.getCourses())
+      setLoading(true)
+      await CourseManagerSupabase.updateChapter(editingChapter.courseId, editingChapter.chapter.id, chapterForm)
+      await loadCourses()
       setEditingChapter(null)
-      setChapterForm({ title: "", description: "", videoUrl: "", duration: "" })
+      setChapterForm({ title: "", description: "", video_url: "", duration: "" })
+      setLoading(false)
     }
   }
 
-  const handleDeleteChapter = (courseId: string, chapterId: string) => {
+  const handleDeleteChapter = async (courseId: string, chapterId: string) => {
     if (confirm("Are you sure you want to delete this chapter?")) {
-      CourseManager.deleteChapter(courseId, chapterId)
-      setCourses(CourseManager.getCourses())
+      setLoading(true)
+      await CourseManagerSupabase.deleteChapter(courseId, chapterId)
+      await loadCourses()
+      setLoading(false)
     }
   }
 
-  const startEditCourse = (course: Course) => {
+  const startEditCourse = (course: CourseWithChapters) => {
     setEditingCourse(course)
     setCourseForm({
       title: course.title,
       description: course.description,
-      thumbnail: course.thumbnail,
+      thumbnail: course.thumbnail || "",
       level: course.level,
       duration: course.duration,
     })
@@ -139,7 +162,7 @@ export default function AdminPage() {
     setChapterForm({
       title: chapter.title,
       description: chapter.description,
-      videoUrl: chapter.videoUrl,
+      video_url: chapter.video_url,
       duration: chapter.duration,
     })
   }
@@ -206,7 +229,7 @@ export default function AdminPage() {
                   />
                 </div>
 
-                <AnimatedButton type="submit" size="lg" className="w-full">
+                <AnimatedButton type="submit" size="lg" className="w-full" loading={loading}>
                   Access Admin Panel
                 </AnimatedButton>
               </form>
@@ -308,7 +331,7 @@ export default function AdminPage() {
             <h2 className="text-3xl font-bold text-white text-glow">Course Management</h2>
             <p className="text-white/70 mt-1">Create, edit, and manage your AutoCAD courses</p>
           </div>
-          <AnimatedButton onClick={() => setShowCourseForm(true)}>
+          <AnimatedButton onClick={() => setShowCourseForm(true)} loading={loading}>
             <Plus className="h-4 w-4 mr-2" />
             New Course
           </AnimatedButton>
@@ -395,7 +418,7 @@ export default function AdminPage() {
                   />
                 </div>
                 <div className="flex space-x-4">
-                  <AnimatedButton type="submit">
+                  <AnimatedButton type="submit" loading={loading}>
                     <Save className="h-4 w-4 mr-2" />
                     {editingCourse ? "Update Course" : "Create Course"}
                   </AnimatedButton>
@@ -426,7 +449,7 @@ export default function AdminPage() {
                   onClick={() => {
                     setShowChapterForm(null)
                     setEditingChapter(null)
-                    setChapterForm({ title: "", description: "", videoUrl: "", duration: "" })
+                    setChapterForm({ title: "", description: "", video_url: "", duration: "" })
                   }}
                   className="text-white/60 hover:text-white transition-all duration-300 hover:scale-110"
                 >
@@ -462,9 +485,9 @@ export default function AdminPage() {
                     YouTube Video URL
                   </Label>
                   <Input
-                    value={chapterForm.videoUrl}
+                    value={chapterForm.video_url}
                     onChange={(e) =>
-                      setChapterForm((prev) => ({ ...prev, videoUrl: formatYouTubeUrl(e.target.value) }))
+                      setChapterForm((prev) => ({ ...prev, video_url: formatYouTubeUrl(e.target.value) }))
                     }
                     className="mt-2 bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-green-400 transition-all duration-300"
                     placeholder="https://www.youtube.com/watch?v=..."
@@ -486,7 +509,7 @@ export default function AdminPage() {
                   />
                 </div>
                 <div className="flex space-x-4">
-                  <AnimatedButton type="submit">
+                  <AnimatedButton type="submit" loading={loading}>
                     <Save className="h-4 w-4 mr-2" />
                     {editingChapter ? "Update Chapter" : "Add Chapter"}
                   </AnimatedButton>
@@ -496,7 +519,7 @@ export default function AdminPage() {
                     onClick={() => {
                       setShowChapterForm(null)
                       setEditingChapter(null)
-                      setChapterForm({ title: "", description: "", videoUrl: "", duration: "" })
+                      setChapterForm({ title: "", description: "", video_url: "", duration: "" })
                     }}
                   >
                     Cancel
@@ -539,7 +562,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div className="flex items-center space-x-2 ml-4">
-                    <AnimatedButton size="sm" onClick={() => setShowChapterForm(course.id)}>
+                    <AnimatedButton size="sm" onClick={() => setShowChapterForm(course.id)} loading={loading}>
                       <Plus className="h-4 w-4 mr-1" />
                       Add Chapter
                     </AnimatedButton>
@@ -551,6 +574,7 @@ export default function AdminPage() {
                       variant="outline"
                       onClick={() => handleDeleteCourse(course.id)}
                       className="border-red-500/50 text-red-300 hover:bg-red-500/20"
+                      loading={loading}
                     >
                       <Trash2 className="h-4 w-4" />
                     </AnimatedButton>
@@ -563,7 +587,7 @@ export default function AdminPage() {
                     <h5 className="text-lg font-semibold text-white mb-4">Chapters</h5>
                     <div className="space-y-3">
                       {course.chapters
-                        .sort((a, b) => a.order - b.order)
+                        .sort((a, b) => a.order_number - b.order_number)
                         .map((chapter, chapterIndex) => (
                           <div
                             key={chapter.id}
@@ -571,7 +595,7 @@ export default function AdminPage() {
                           >
                             <div className="flex-1">
                               <div className="flex items-center space-x-3">
-                                <span className="text-white/60 text-sm animate-pulse">#{chapter.order}</span>
+                                <span className="text-white/60 text-sm animate-pulse">#{chapter.order_number}</span>
                                 <h6 className="text-white font-medium">{chapter.title}</h6>
                                 <span className="text-white/50 text-sm">({chapter.duration})</span>
                               </div>
@@ -590,6 +614,7 @@ export default function AdminPage() {
                                 variant="outline"
                                 onClick={() => handleDeleteChapter(course.id, chapter.id)}
                                 className="border-red-500/50 text-red-300 hover:bg-red-500/20"
+                                loading={loading}
                               >
                                 <Trash2 className="h-3 w-3" />
                               </AnimatedButton>
@@ -605,7 +630,7 @@ export default function AdminPage() {
         </div>
 
         {/* Empty State */}
-        {courses.length === 0 && (
+        {courses.length === 0 && !loading && (
           <FloatingCard>
             <div className="glass rounded-2xl text-center py-16">
               <Logo size="xl" className="mx-auto mb-6 animate-bounce" />
@@ -619,6 +644,13 @@ export default function AdminPage() {
               </AnimatedButton>
             </div>
           </FloatingCard>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+          </div>
         )}
       </div>
     </div>
